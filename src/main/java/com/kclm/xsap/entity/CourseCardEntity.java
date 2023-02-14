@@ -1,5 +1,6 @@
 package com.kclm.xsap.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
@@ -23,7 +24,7 @@ public class CourseCardEntity implements Serializable {
 	/**
 	 * 会员卡id
 	 */
-	@TableId
+	@TableId(type = IdType.INPUT)
 	private Long cardId;
 	/**
 	 * 课程id

@@ -16,7 +16,7 @@ import lombok.EqualsAndHashCode;
  */
 @Data
 @EqualsAndHashCode(callSuper=false)
-public class MemberDTO{
+public class MemberDTO<ReserveRecordDTO> {
 
     private Long id;
     /**

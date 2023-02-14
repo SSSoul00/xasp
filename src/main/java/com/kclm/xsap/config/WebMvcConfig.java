@@ -7,6 +7,8 @@ package com.kclm.xsap.config;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.web.servlet.ServletComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.validation.Validator;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -38,5 +40,12 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addResourceHandler("/images/**").addResourceLocations(UPLOAD_IMAGE_URL);
     }
 
+
+    @Override
+    public Validator getValidator() {
+        LocalValidatorFactoryBean lvfb = new LocalValidatorFactoryBean();
+        //返回
+        return lvfb;
+    }
 
 }

@@ -19,7 +19,7 @@ import java.util.List;
 public interface EmployeeDao extends BaseMapper<EmployeeEntity> {
 
     /*这应该是一个通用方法，应该查完整信息，但这里只是查老师名字，---以后少用mybatis plus*/
-    @Select("select `name`, `is_deleted` from t_employee where `id` = #{teacherId}")
+    @Select("select `name`, `is_deleted` from xsap_dev7.t_employee where `id` = #{teacherId}")
     EmployeeEntity selectTeacherNameById(@Param("teacherId") Long teacherId);
 
     /*

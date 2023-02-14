@@ -102,7 +102,7 @@ public class EmployeeController {
         model.addAttribute("USER_NOT_EXIST", flag);
         if (flag) {
             session.setAttribute("LOGIN_USER", isExistEmp);
-            return "redirect:/index";
+            return "index";
         } else {
             return "x_login";
         }
