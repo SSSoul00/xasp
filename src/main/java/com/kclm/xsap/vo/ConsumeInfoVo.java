@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
  */
 
 @Data
-@Accessors
+@Accessors(chain = true)
 public class ConsumeInfoVo {
 
 

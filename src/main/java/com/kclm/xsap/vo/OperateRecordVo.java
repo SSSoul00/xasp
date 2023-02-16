@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
  */
 
 @Data
-@Accessors
+@Accessors(chain = true)
 public class OperateRecordVo {
     /**
      * 操作记录id

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+import javax.servlet.http.HttpSession;
 import java.time.LocalDateTime;
 
 @RequestMapping("/index")
@@ -17,6 +18,12 @@ import java.time.LocalDateTime;
 public class IndexController {
     @Autowired
     private EmployeeService employeeService;
+
+    @RequestMapping("logout")
+    public String logout(HttpSession session){
+        session.invalidate();
+        return "x_login";
+    }
 
     @RequestMapping("/toRegister")
     public String toRegister() {
