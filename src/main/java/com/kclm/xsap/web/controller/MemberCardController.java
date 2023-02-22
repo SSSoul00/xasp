@@ -1,9 +1,14 @@
 package com.kclm.xsap.web.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.kclm.xsap.consts.OperateType;
+import com.kclm.xsap.dto.convert.OperateRecordVoConvert;
 import com.kclm.xsap.entity.*;
 import com.kclm.xsap.service.*;
 import com.kclm.xsap.utils.R;
+import com.kclm.xsap.vo.CardBindVo;
+import com.kclm.xsap.vo.CardTipVo;
+import com.kclm.xsap.vo.ConsumeFormVo;
 import com.kclm.xsap.vo.OperateRecordVo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +31,12 @@ import java.util.stream.Collectors;
 @Slf4j
 public class MemberCardController {
     @Autowired
+    private CourseService courseService;
+    @Autowired
+    private OperateRecordVoConvert operateRecordVoConvert;
+    @Autowired
+    private ConsumeRecordService consumeRecordService;
+    @Autowired
     private RechargeRecordService rechargeRecordService;
     @Autowired
     private MemberLogService memberLogService;
@@ -35,6 +46,57 @@ public class MemberCardController {
     private CourseCardService courseCardService;
     @Autowired
     private MemberCardService memberCardService;
+    @Autowired
+    private ScheduleRecordService scheduleRecordService;
+    @Autowired
+    private ClassRecordService classRecordService;
+    @RequestMapping("/consumeOpt.do")
+    @ResponseBody
+    public R consumeOpt(ConsumeFormVo consumeFormVo) {
+        //扣费
+        MemberBindRecordEntity bindCard = memberBindRecordService.getById(consumeFormVo.getCardBindId());
+        bindCard.setValidCount(bindCard.getValidCount() - consumeFormVo.getCardCountChange()).setReceivedMoney(bindCard.getReceivedMoney().subtract(consumeFormVo.getAmountOfConsumption()))
+                .setLastModifyTime(LocalDateTime.now()).setVersion(bindCard.getVersion() + 1);
+        memberBindRecordService.updateById(bindCard);
+        //添加未预约上课记录
+        String cardName = memberCardService.getById(bindCard.getCardId()).getName();
+        ClassRecordEntity classRecord = new ClassRecordEntity().setMemberId(consumeFormVo.getMemberId()).setCardName(cardName).setScheduleId(consumeFormVo.getScheduleId())
+                .setNote(consumeFormVo.getNote()).setCheckStatus(1).setReserveCheck(0).setCreateTime(LocalDateTime.now()).setBindCardId(consumeFormVo.getCardBindId());
+        classRecordService.save(classRecord);
+        //添加消费操作记录
+        MemberLogEntity memberLog = new MemberLogEntity().setType(OperateType.CLASS_DEDUCTION_OPERATION.getMsg()).setInvolveMoney(consumeFormVo.getAmountOfConsumption())
+                .setOperator(consumeFormVo.getOperator()).setMemberBindId(consumeFormVo.getCardBindId()).setCreateTime(LocalDateTime.now()).setCardCountChange(consumeFormVo.getCardCountChange())
+                .setNote("无预约扣费");
+        memberLogService.save(memberLog);
+        //添加消费记录
+        ConsumeRecordEntity consumeRecord = new ConsumeRecordEntity().setOperateType(OperateType.CLASS_DEDUCTION_OPERATION.getMsg()).setCardCountChange(consumeFormVo.getCardCountChange())
+                .setMoneyCost(consumeFormVo.getAmountOfConsumption()).setOperator(consumeFormVo.getOperator()).setNote("无预约扣费").setMemberBindId(consumeFormVo.getCardBindId())
+                .setCreateTime(LocalDateTime.now()).setLogId(memberLog.getId()).setScheduleId(consumeFormVo.getScheduleId());
+        consumeRecordService.save(consumeRecord);
+        return R.ok("扣费成功");
+    }
+
+    @RequestMapping("/cardTip.do")
+    @ResponseBody
+    public R cardTip(Long cardId, Long scheduleId) {
+        MemberBindRecordEntity memberBindRecord = memberBindRecordService.getById(cardId);
+        ScheduleRecordEntity scheduleRecordServiceById = scheduleRecordService.getById(scheduleId);
+        CourseEntity course = courseService.getById(scheduleRecordServiceById.getCourseId());
+        CardTipVo cardTipVo = new CardTipVo().setCardTotalCount(memberBindRecord.getValidCount()).setCourseTimesCost(course.getTimesCost());
+        return R.ok().setData(cardTipVo);
+    }
+
+    @RequestMapping("/toSearchByMemberId.do")
+    @ResponseBody
+    public R searchByMemberId(Long memberId) {
+        List<MemberBindRecordEntity> memberBindRecords = memberBindRecordService.list(new LambdaQueryWrapper<MemberBindRecordEntity>().eq(MemberBindRecordEntity::getMemberId, memberId)
+                .eq(MemberBindRecordEntity::getActiveStatus, 1));
+        List<CardBindVo> cardBindVos = memberBindRecords.stream().map(item -> {
+            MemberCardEntity card = memberCardService.getById(item.getCardId());
+            return new CardBindVo().setName(card.getName()).setId(item.getId());
+        }).collect(Collectors.toList());
+        return R.ok().put("value", cardBindVos);
+    }
 
     @RequestMapping("/x_member_card.do")
     public String toMemberCard() {
@@ -113,20 +175,28 @@ public class MemberCardController {
                 .eq(one != null, MemberLogEntity::getMemberBindId, one.getId()));
         List<OperateRecordVo> operateRecordVos = new ArrayList<>();
         list.forEach(item -> {
-            if (item.getType().contains("充值")||item.getType().contains("绑卡")){
+            if (item.getType().contains("充值") || item.getType().contains("绑卡")) {
                 RechargeRecordEntity rechargeRecord = rechargeRecordService.getOne(new LambdaQueryWrapper<RechargeRecordEntity>()
                         .eq(RechargeRecordEntity::getLogId, item.getId()));
-                OperateRecordVo operateRecordVo = new OperateRecordVo().setId(item.getId())
-                        .setOperateType(item.getType()).setOperateTime(item.getCreateTime())
-                        .setAddCount(rechargeRecord.getAddCount()).setChangeCount(rechargeRecord.getAddCount())
-                        .setReceivedMoney(rechargeRecord.getReceivedMoney())
-                        .setOperator(rechargeRecord.getOperator()).setCardNote(item.getNote())
-                        .setCreateTime(item.getCreateTime()).setLastModifyTime(item.getLastModifyTime())
-                        .setStatus(item.getCardActiveStatus()).setChangeMoney("￥" + rechargeRecord.getReceivedMoney().toString());
+                OperateRecordVo operateRecordVo = operateRecordVoConvert.rechargeEntity2Vo(item, rechargeRecord, "￥" + rechargeRecord.getReceivedMoney());
+//                OperateRecordVo operateRecordVo = new OperateRecordVo().setId(item.getId())
+//                        .setOperateType(item.getType()).setOperateTime(item.getCreateTime())
+//                        .setAddCount(rechargeRecord.getAddCount()).setChangeCount(rechargeRecord.getAddCount())
+//                        .setReceivedMoney(rechargeRecord.getReceivedMoney())
+//                        .setOperator(rechargeRecord.getOperator()).setCardNote(item.getNote())
+//                        .setCreateTime(item.getCreateTime()).setLastModifyTime(item.getLastModifyTime())
+//                        .setStatus(item.getCardActiveStatus()).setChangeMoney("￥" + rechargeRecord.getReceivedMoney());
                 operateRecordVos.add(operateRecordVo);
-            }else {
+            } else if (item.getType().contains("扣费")) {
+                ConsumeRecordEntity consumeRecord = consumeRecordService.getOne(new LambdaQueryWrapper<ConsumeRecordEntity>()
+                        .eq(ConsumeRecordEntity::getLogId, item.getId()));
+                OperateRecordVo operateRecordVo = operateRecordVoConvert.consumerEntity2Vo(item, consumeRecord, "-￥" + consumeRecord.getMoneyCost());
+                Integer changeCount = operateRecordVo.getChangeCount();
+                operateRecordVo.setChangeCount(changeCount - (changeCount + changeCount));
+                operateRecordVos.add(operateRecordVo);
+            } else {
                 OperateRecordVo operateRecordVo = new OperateRecordVo().setId(item.getId()).setOperateTime(item.getCreateTime())
-                        .setOperateType(item.getType()).setChangeCount(0).setChangeMoney("￥"+0).setOperator(item.getOperator())
+                        .setOperateType(item.getType()).setChangeCount(0).setChangeMoney("￥" + 0).setOperator(item.getOperator())
                         .setStatus(item.getCardActiveStatus());
                 operateRecordVos.add(operateRecordVo);
             }

@@ -5,6 +5,7 @@
 package com.kclm.xsap.config;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.system.ApplicationHome;
 import org.springframework.boot.web.servlet.ServletComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.Validator;
@@ -25,11 +26,12 @@ public class WebMvcConfig implements WebMvcConfigurer {
     private final String UPLOAD_IMAGE_URL;
 
     public WebMvcConfig() {
-        log.debug("虚拟映射路径处理");
+        log.info("虚拟映射路径处理");
+        ApplicationHome applicationHome = new ApplicationHome(getClass());
         String homeDir = System.getProperty("user.dir");
 //        UPLOAD_IMAGE_URL = "file:" + homeDir + "\\upload\\images\\";
-        UPLOAD_IMAGE_URL = "file:" + homeDir + "/upload/images/";
-        log.debug("\n----> 上传的图片映射路径：{}",UPLOAD_IMAGE_URL);
+        UPLOAD_IMAGE_URL = "file:" + applicationHome.getDir() + "/upload/images/";
+        log.info("\n----> 上传的图片映射路径：{}",UPLOAD_IMAGE_URL);
     }
 
 

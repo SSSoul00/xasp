@@ -1,6 +1,7 @@
 package com.kclm.xsap.web.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.kclm.xsap.consts.OperateType;
 import com.kclm.xsap.entity.*;
 import com.kclm.xsap.service.MemberBindRecordService;
 import com.kclm.xsap.service.MemberCardService;
@@ -53,19 +54,23 @@ public class CardBindController {
             return R.error(400, "非法参数").put("errorMap", errorMap);
         }
 
+
         //绑卡
         MemberCardEntity one = memberCardService.getOne(new LambdaQueryWrapper<MemberCardEntity>()
                 .eq(mbre != null, MemberCardEntity::getId, mbre.getCardId()));
+        if (mbre.getReceivedMoney().compareTo(one.getPrice()) == -1){
+            return R.error("您给的钱连卡费都不够");
+        }
         mbre.setValidCount(mbre.getValidCount() + one.getTotalCount()).setValidDay(mbre.getValidDay() + one.getTotalDay())
-                .setCreateTime(LocalDateTime.now()).setLastModifyTime(LocalDateTime.now());
+                .setCreateTime(LocalDateTime.now()).setLastModifyTime(LocalDateTime.now()).setReceivedMoney(mbre.getReceivedMoney());
         memberBindRecordService.save(mbre);
 
         //操作记录
-        MemberLogEntity ml = new MemberLogEntity().setMemberBindId(mbre.getId()).setType("绑卡")
+        MemberLogEntity ml = new MemberLogEntity().setMemberBindId(mbre.getId()).setType(OperateType.BINDING_CARD_OPERATION.getMsg())
                 .setInvolveMoney(one.getPrice()).setNote("绑卡")
                 .setOperator(((EmployeeEntity) session.getAttribute("LOGIN_USER")).getName()).setCreateTime(LocalDateTime.now());
-        MemberLogEntity m2 = new MemberLogEntity().setMemberBindId(mbre.getId()).setType("绑卡充值")
-                .setInvolveMoney(mbre.getReceivedMoney().subtract(one.getPrice())).setNote("充值")
+        MemberLogEntity m2 = new MemberLogEntity().setMemberBindId(mbre.getId()).setType(OperateType.BIND_CARD_RECHARGE_OPERATION.getMsg())
+                .setInvolveMoney(mbre.getReceivedMoney().subtract(one.getPrice())).setNote("绑卡充值")
                 .setOperator(((EmployeeEntity) session.getAttribute("LOGIN_USER")).getName()).setCreateTime(LocalDateTime.now());
         List<MemberLogEntity> memberLogEntityList = Arrays.asList(ml, m2);
         memberLogService.save(ml);
@@ -75,8 +80,8 @@ public class CardBindController {
         RechargeRecordEntity r1 = new RechargeRecordEntity().setAddCount(one.getTotalCount()).setAddDay(one.getTotalDay())
                 .setOperator(((EmployeeEntity) session.getAttribute("LOGIN_USER")).getName()).setCreateTime(LocalDateTime.now())
                 .setReceivedMoney(one.getPrice()).setPayMode(mbre.getPayMode()).setNote("绑卡").setMemberBindId(mbre.getId()).setLogId(ml.getId());
-        RechargeRecordEntity r2 = new RechargeRecordEntity().setAddCount(mbre.getValidCount() - one.getTotalCount())
-                .setAddDay(mbre.getValidDay() - one.getTotalDay())
+        RechargeRecordEntity r2 = new RechargeRecordEntity().setAddCount(mbre.getValidCount()-one.getTotalCount())
+                .setAddDay(mbre.getValidDay()-one.getTotalDay())
                 .setOperator(((EmployeeEntity) session.getAttribute("LOGIN_USER")).getName()).setCreateTime(LocalDateTime.now())
                 .setReceivedMoney(mbre.getReceivedMoney().subtract(one.getPrice())).setPayMode(mbre.getPayMode()).setNote("绑卡充值")
                 .setMemberBindId(mbre.getId()).setLogId(m2.getId());

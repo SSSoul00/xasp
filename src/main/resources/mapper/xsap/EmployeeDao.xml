@@ -24,7 +24,7 @@
     </resultMap>
     <select id="selectTeacherNameListByIds" resultType="com.kclm.xsap.entity.EmployeeEntity">
         select `name`, `is_deleted`
-        from t_employee
+        from xsap_dev7.t_employee
         where `id`
         in
         <foreach collection="teacherIdList" item="item" index="index" open="(" close=")" separator=",">

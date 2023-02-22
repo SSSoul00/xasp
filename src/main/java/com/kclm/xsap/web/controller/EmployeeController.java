@@ -1,5 +1,6 @@
 package com.kclm.xsap.web.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.kclm.xsap.entity.*;
 import com.kclm.xsap.service.*;
@@ -66,6 +67,14 @@ public class EmployeeController {
 
     @Resource
     private ReservationRecordService reservationRecordService;
+
+
+//    @RequestMapping("/modifyUser.do")
+//    @ResponseBody
+//    public R modifyUser(EmployeeEntity employee){
+//
+//        return R.ok();
+//    }
 
 
     /**

@@ -18,7 +18,7 @@ public interface ReservationRecordVoConvert {
             @Mapping(source = "record.status", target = "reserveStatus"),
             @Mapping(source = "record.createTime", target = "operateTime"),
             @Mapping(source = "record.classNote", target = "reserveNote"),
-            @Mapping(source = "scheduleRecord.orderNums", target = "reserveNumbers"),
+            @Mapping(source = "record.reserveNums", target = "reserveNumbers"),
 //            @Mapping(source = "record.createTime", target = "reserveTime"),
             @Mapping(source = "course.name", target = "courseName"),
     })

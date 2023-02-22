@@ -1,6 +1,7 @@
 package com.kclm.xsap.web.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.kclm.xsap.dto.convert.*;
 import com.kclm.xsap.entity.*;
 import com.kclm.xsap.service.*;
@@ -8,14 +9,18 @@ import com.kclm.xsap.utils.R;
 import com.kclm.xsap.vo.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.system.ApplicationHome;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.validation.Valid;
+import java.io.File;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -26,6 +31,11 @@ import java.util.stream.Collectors;
 @RequestMapping("/member")
 @Slf4j
 public class MemberController {
+    private ApplicationHome applicationHome = new ApplicationHome(getClass());
+
+    private static final String UPLOAD_IMAGES_MEMBER_IMG = "upload/images/member_img/";
+    @Autowired
+    private ConsumeRecordService consumeRecordService;
     @Autowired
     private ClassRecordConvertt classRecordConvertt;
     @Autowired
@@ -50,6 +60,32 @@ public class MemberController {
     private MemberBindRecordService memberBindRecordService;
     @Autowired
     private MemberService memberService;
+
+    @RequestMapping("modifyMemberImg.do")
+    @ResponseBody
+    public R modifyMemberImg(Long id, MultipartFile avatarFile) throws IOException {
+        MemberEntity member = memberService.getById(id);
+        File dir = applicationHome.getDir();
+        File realPath = new File(dir, UPLOAD_IMAGES_MEMBER_IMG);
+        if (!realPath.exists()) {
+            log.info("创建上传文件目录结构");
+            realPath.mkdirs();
+        }
+        String originalFilename = avatarFile.getOriginalFilename();
+        String substring = originalFilename.substring(originalFilename.lastIndexOf("."));
+        String fileName = UUID.randomUUID().toString() + substring;
+        member.setAvatarUrl(fileName);
+        memberService.updateById(member);
+        avatarFile.transferTo(new File(realPath, fileName));
+        return R.ok("修改头像成功").put("avatarUrl", fileName);
+    }
+
+    @RequestMapping("/toSearch.do")
+    @ResponseBody
+    public R searchMember() {
+        List<MemberEntity> memberEntities = memberService.list();
+        return R.ok().put("value", memberEntities);
+    }
 
     @RequestMapping("/x_member_list.do")
     public String toX_Member_List() {
@@ -121,14 +157,15 @@ public class MemberController {
     public R memberEdit(MemberEntity member) {
         MemberEntity m = memberService.getById(member);
         member.setVersion(m.getVersion() + 1);
-        boolean b = memberService.updateById(member);
+        memberService.updateById(member);
         return R.ok("更新成功");
     }
 
     @RequestMapping("/deleteOne.do")
     @ResponseBody
     public R deleteOne(Integer id) {
-        boolean b = memberService.removeById(id);
+        LambdaUpdateWrapper uw = new LambdaUpdateWrapper<MemberEntity>().eq(MemberEntity::getId,id).set(MemberEntity::getIsDeleted,1).set(MemberEntity::getLastModifyTime,LocalDateTime.now());
+        memberService.update(uw);
         return R.ok("删除成功");
     }
 
@@ -140,7 +177,7 @@ public class MemberController {
 
     @RequestMapping("/memberDetail.do")
     @ResponseBody
-    public R getMemberDetail(Integer id) {
+    public R getMemberDetail(Long id) {
         MemberEntity member = memberService.getById(id);
         return R.ok().setData(member);
     }
@@ -179,12 +216,15 @@ public class MemberController {
             String cardName = memberCardService.getOne(new LambdaQueryWrapper<MemberCardEntity>().eq(MemberCardEntity::getId, item.getCardId())).getName();
             List<MemberLogEntity> memberLogEntities = memberLogService.list(new LambdaQueryWrapper<MemberLogEntity>().eq(MemberLogEntity::getMemberBindId, bindId));
             memberLogEntities.forEach(item2 -> {
-                ConsumeInfoVo consumeInfoVo = new ConsumeInfoVo().setConsumeId(item2.getId()).setCardName(cardName)
-                        .setOperateTime(item2.getCreateTime()).setCardCountChange(0).setTimesRemainder(item.getValidCount())
-                        .setMoneyCostBigD(item2.getInvolveMoney()).setMoneyCost("-￥" + item2.getInvolveMoney().toString())
-                        .setOperateType(item2.getType()).setOperator(item2.getOperator()).setNote(item.getNote()).setCreateTime(item.getCreateTime())
-                        .setLastModifyTime(item.getCreateTime());
-                consumeInfoVos.add(consumeInfoVo);
+                if (item2.getType().contains("扣费")) {
+                    ConsumeRecordEntity consumeRecord = consumeRecordService.getOne(new LambdaQueryWrapper<ConsumeRecordEntity>().eq(ConsumeRecordEntity::getLogId, item2.getId()));
+                    ConsumeInfoVo consumeInfoVo = new ConsumeInfoVo().setConsumeId(item2.getId()).setCardName(cardName)
+                            .setOperateTime(item2.getCreateTime()).setCardCountChange(consumeRecord.getCardCountChange()).setTimesRemainder(item.getValidCount())
+                            .setMoneyCostBigD(item2.getInvolveMoney()).setMoneyCost("-￥" + item2.getInvolveMoney().toString())
+                            .setOperateType(item2.getType()).setOperator(item2.getOperator()).setNote(consumeRecord.getNote()).setCreateTime(item.getCreateTime())
+                            .setLastModifyTime(item.getCreateTime());
+                    consumeInfoVos.add(consumeInfoVo);
+                }
             });
         });
         return R.ok().setData(consumeInfoVos);
@@ -217,7 +257,8 @@ public class MemberController {
             ReservationRecordEntity rre = reservationRecordService.getOne(new LambdaQueryWrapper<ReservationRecordEntity>().eq(ReservationRecordEntity::getMemberId, id)
                     .eq(ReservationRecordEntity::getScheduleId, sre.getId()));
             LocalDateTime classTime = LocalDateTime.of(sre.getStartDate(), sre.getClassTime());
-            ClassRecordVoo classRecordVoo = classRecordConvertt.entity2Vo(item, sre, rre.getReserveNums(), ce, ee.getName(), classTime);
+            Integer reserveNums = rre == null ? 1 : rre.getReserveNums();
+            ClassRecordVoo classRecordVoo = classRecordConvertt.entity2Vo(item, sre,reserveNums, ce, ee.getName(), classTime);
             return classRecordVoo;
         }).collect(Collectors.toList());
         return R.ok().setData(classRecordVoos);
